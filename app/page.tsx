@@ -718,6 +718,54 @@ export default function Home() {
             </div>
           </Panel>
 		  
+		            <Panel
+            eyebrow="Agent Intelligence"
+            title="Why this is not just an LLM call"
+          >
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+              <p className="text-base leading-7 text-slate-800">
+                The agent does not directly generate copy from a single prompt.
+                It first converts company context and candidate replies into an
+                explicit decision model: personality, policy, candidate state,
+                detected risk, next-best-action, sequence control, and then a
+                response. An LLM can be used as the language layer, but the agent
+                decides what it is trying to do before it writes.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="font-semibold text-slate-950">
+                  Context becomes policy
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Company inputs are transformed into stable agent behavior:
+                  tone, principles, hiring filter, and outreach intent.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="font-semibold text-slate-950">
+                  Replies become state
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Candidate replies are classified into states such as interested,
+                  constrained, compensation-focused, timing-constrained, or rejected.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="font-semibold text-slate-950">
+                  State controls action
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  The agent can continue, pause, or stop the sequence instead of
+                  blindly sending the next message.
+                </p>
+              </div>
+            </div>
+          </Panel>
+		  
           <Panel
             eyebrow="Reasoning Trace"
             title="Why the agent behaves this way"
