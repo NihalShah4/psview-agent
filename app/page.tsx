@@ -41,6 +41,13 @@ type CandidateAnalysis = {
   response: string;
 };
 
+type AutonomyStep = {
+  label: string;
+  title: string;
+  description: string;
+  value: string;
+};
+
 const sampleContext: CompanyContext = {
   companyName: "PSVIEW",
   companyDescription:
@@ -224,6 +231,56 @@ function generateAgent(context: CompanyContext): AgentOutput {
     reasoningTrace: buildReasoningTrace(context),
     messageSequence: buildMessageSequence(context),
   };
+}
+
+function buildAutonomyLoop(
+  context: CompanyContext,
+  analysis: CandidateAnalysis
+): AutonomyStep[] {
+  return [
+    {
+      label: "01",
+      title: "Company Context",
+      description:
+        "The agent starts from structured company input instead of a generic prompt.",
+      value: context.companyName || "Company context not provided",
+    },
+    {
+      label: "02",
+      title: "Agent Policy",
+      description:
+        "The company context is converted into personality, tone, operating principles, and behavioral constraints.",
+      value: context.tone || "Professional and human",
+    },
+    {
+      label: "03",
+      title: "Message Plan",
+      description:
+        "The agent creates a multi-step engagement sequence with objectives, not isolated messages.",
+      value: `${context.role || "Target role"} engagement sequence`,
+    },
+    {
+      label: "04",
+      title: "Candidate Signal",
+      description:
+        "The candidate reply is classified into signals such as interest, compensation, logistics, timing, or rejection.",
+      value: analysis.detectedSignals.join(", "),
+    },
+    {
+      label: "05",
+      title: "State Decision",
+      description:
+        "The agent chooses a candidate state and risk profile before deciding how to respond.",
+      value: `${analysis.candidateState} · ${analysis.confidence}% confidence`,
+    },
+    {
+      label: "06",
+      title: "Next Action",
+      description:
+        "The sequence is continued, paused, or stopped based on the candidate state.",
+      value: `${analysis.shouldContinue}: ${analysis.nextBestAction}`,
+    },
+  ];
 }
 
 function analyzeCandidateReply(
@@ -461,6 +518,11 @@ export default function Home() {
     [candidateReply, context]
   );
 
+  const autonomyLoop = useMemo(
+    () => buildAutonomyLoop(context, analysis),
+    [context, analysis]
+  );
+
   function updateField(field: keyof CompanyContext, value: string) {
     setContext((previous) => ({
       ...previous,
@@ -648,6 +710,14 @@ export default function Home() {
             </div>
           </Panel>
 
+          <Panel eyebrow="Autonomy Loop" title="How the agent acts without step-by-step driving">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {autonomyLoop.map((step) => (
+                <AutonomyStepCard key={step.label} step={step} />
+              ))}
+            </div>
+          </Panel>
+		  
           <Panel
             eyebrow="Reasoning Trace"
             title="Why the agent behaves this way"
@@ -817,6 +887,31 @@ function Panel({
       <h2 className="mb-5 text-2xl font-semibold text-slate-950">{title}</h2>
 
       {children}
+    </div>
+  );
+}
+
+function AutonomyStepCard({ step }: { step: AutonomyStep }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="rounded-full bg-blue-600 px-3 py-1 text-sm font-bold text-white">
+          {step.label}
+        </span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <h3 className="font-semibold text-slate-950">{step.title}</h3>
+
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        {step.description}
+      </p>
+
+      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
+        <p className="text-sm font-semibold leading-6 text-blue-700">
+          {step.value}
+        </p>
+      </div>
     </div>
   );
 }
