@@ -720,7 +720,7 @@ export default function Home() {
 		  
 		            <Panel
             eyebrow="Agent Intelligence"
-            title="Why this is not just an LLM call"
+            title="Why this is not a prompt wrapper"
           >
             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
               <p className="text-base leading-7 text-slate-800">
