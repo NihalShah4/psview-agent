@@ -82,6 +82,14 @@ function matchedKeywords(text: string, keywords: string[]) {
   return keywords.filter((keyword) => normalized.includes(keyword));
 }
 
+function cleanSentence(text: string) {
+  return text.trim().replace(/[.!?]+$/, "");
+}
+
+function lowerClean(text: string) {
+  return cleanSentence(text).toLowerCase();
+}
+
 function inferAgentName(companyName: string) {
   const cleanName = companyName.trim() || "Company";
   return `${cleanName} Talent Agent`;
@@ -179,9 +187,9 @@ function buildReasoningTrace(context: CompanyContext) {
 function buildMessageSequence(context: CompanyContext): MessageStep[] {
   const company = context.companyName || "the company";
   const role = context.role || "the role";
-  const culture = context.culture || "a high-context team";
-  const intent = context.intent || "start a relevant conversation";
-  const hiringProfile = context.hiringProfile || "strong candidates";
+  const culture = lowerClean(context.culture || "a high-context team");
+  const intent = lowerClean(context.intent || "start a relevant conversation");
+  const hiringProfile = lowerClean(context.hiringProfile || "strong candidates");
 
   return [
     {
