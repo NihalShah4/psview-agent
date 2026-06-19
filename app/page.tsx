@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type CompanyContext = {
   companyName: string;
@@ -88,6 +88,16 @@ function cleanPhrase(text: string) {
 
 function lowerPhrase(text: string) {
   return cleanPhrase(text).toLowerCase();
+}
+
+function isFoundingContext(context: CompanyContext) {
+  return includesAny(Object.values(context).join(" "), [
+    "founder",
+    "founding",
+    "early-stage",
+    "early stage",
+    "high-agency",
+  ]);
 }
 
 function inferAgentName(companyName: string) {
@@ -182,11 +192,12 @@ function buildReasoningTrace(context: CompanyContext) {
 }
 
 function buildMessageSequence(context: CompanyContext): MessageStep[] {
-  const company = context.companyName || "the company";
-  const role = context.role || "the role";
-  const culture = lowerPhrase(context.culture || "a high-context team");
-  const intent = lowerPhrase(context.intent || "start a relevant conversation");
-  const hiringProfile = lowerPhrase(context.hiringProfile || "strong candidates");
+	const company = context.companyName || "the company";
+	const role = context.role || "the role";
+	const culture = lowerPhrase(context.culture || "a high-context team");
+	const intent = lowerPhrase(context.intent || "start a relevant conversation");
+	const hiringProfile = lowerPhrase(context.hiringProfile || "strong candidates");
+	const foundingContext = isFoundingContext(context);
 
   return [
     {
@@ -207,15 +218,16 @@ function buildMessageSequence(context: CompanyContext): MessageStep[] {
         "The second message gives context only after the candidate has a reason to care. It frames the opportunity around fit, not hype.",
       message: `${company} is not trying to run a generic hiring process. The goal is to find ${hiringProfile}. The reason I am reaching out is simple: ${intent}. If that kind of environment is interesting, I can share more context and see whether there is a real fit.`,
     },
-    {
-      step: 3,
-      title: "Founder-Caliber Filter",
-      channel: "Follow-up",
-      objective: "Test judgment, appetite, and seriousness.",
-      psychology:
-        "This message qualifies for ambiguity tolerance. Strong founding candidates usually respond well to ownership; weaker-fit candidates often self-select out.",
-      message: `A useful way to think about this role: you would not be handed a perfect spec. You would be expected to reason from the company goal, choose the right technical path, and ship. Does that kind of role sound energizing or draining to you?`,
-    },
+	{
+	  step: 3,
+	  title: foundingContext ? "Founder-Caliber Filter" : "Ownership Filter",
+	  channel: "Follow-up",
+	  objective: "Test judgment, appetite, and seriousness.",
+	  psychology: foundingContext
+		? "This message qualifies for ambiguity tolerance. Strong founding candidates usually respond well to ownership; weaker-fit candidates often self-select out."
+		: "This message qualifies for ownership and product judgment. Strong candidates often want to know whether they can shape decisions or only execute tickets.",
+	  message: `A useful way to think about this role: you would not be expected to only execute tickets. You would be expected to reason from the company goal, choose the right technical path, and ship. Does that kind of role sound energizing or draining to you?`,
+	},
     {
       step: 4,
       title: "Conversion Ask",
@@ -344,14 +356,21 @@ function analyzeCandidateReply(
     "few weeks",
   ]);
 
-  const autonomySignals = matchedKeywords(reply, [
-    "autonomy",
-    "ownership",
-    "ambiguity",
-    "scope",
-    "decision",
-    "responsibility",
-  ]);
+	const autonomySignals = matchedKeywords(reply, [
+	  "autonomy",
+	  "ownership",
+	  "ambiguity",
+	  "scope",
+	  "decision",
+	  "responsibility",
+	  "product thinking",
+	  "implementing tickets",
+	  "tickets",
+	  "execution",
+	  "just implementing",
+	  "product versus",
+	  "product vs",
+	]);
 
   if (!candidateReply.trim()) {
     return {
@@ -459,7 +478,7 @@ function analyzeCandidateReply(
         "Respond with specifics about ownership and propose a technical conversation.",
       shouldContinue: "Continue",
       reasoning:
-        "The candidate is interested and is evaluating whether the opportunity has real scope. This is a strong signal for a founding role because they care about autonomy, not just title.",
+        `The candidate is interested and is evaluating whether the opportunity has real scope. This is a strong signal for a ${role} because the candidate is evaluating real ownership, not just title.`,
       response: `That is exactly the right question. For ${company}, autonomy should mean owning the path from ambiguous product goal to shipped technical decision, not just choosing tickets independently. For the ${role}, the most useful conversation would be about how you reason through unclear constraints and decide what to build. Worth a short technical conversation this week?`,
     };
   }
@@ -491,7 +510,7 @@ function analyzeCandidateReply(
         "Clarify what autonomy means in the company context and ask what level of ownership they want.",
       shouldContinue: "Continue",
       reasoning:
-        "The candidate is probing role quality. For a founding role, that is a valuable signal because strong candidates often evaluate autonomy before process.",
+        `The candidate is probing role quality. For a ${role}, that is a valuable signal because strong candidates often evaluate ownership, product input, and decision-making scope before process.`,
       response: `Good question. I would define autonomy here as owning the reasoning path, not just owning tasks. The question is whether you want a role where the problem may be clear, but the technical path is yours to shape. What level of ownership would make this worth exploring for you?`,
     };
   }
@@ -516,6 +535,12 @@ export default function Home() {
   const [candidateReply, setCandidateReply] = useState(
     "This sounds interesting, but I would want to understand how much autonomy the role actually has."
   );
+  
+  const [openAiResponse, setOpenAiResponse] = useState("");
+  const [openAiStatus, setOpenAiStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [openAiError, setOpenAiError] = useState("");
 
   const agent = useMemo(() => generateAgent(context), [context]);
   const analysis = useMemo(
@@ -527,6 +552,12 @@ export default function Home() {
     () => buildAutonomyLoop(context, analysis),
     [context, analysis]
   );
+  
+  useEffect(() => {
+    setOpenAiResponse("");
+    setOpenAiError("");
+    setOpenAiStatus("idle");
+  }, [candidateReply, context]);
 
   function updateField(field: keyof CompanyContext, value: string) {
     setContext((previous) => ({
@@ -534,6 +565,54 @@ export default function Home() {
       [field]: value,
     }));
   }
+  
+  async function generateOpenAiResponse() {
+  setOpenAiStatus("loading");
+  setOpenAiError("");
+  setOpenAiResponse("");
+
+  try {
+    const response = await fetch("/api/language-layer", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        companyContext: context,
+        candidateReply,
+        decisionModel: {
+          candidateState: analysis.candidateState,
+          confidence: analysis.confidence,
+          detectedSignals: analysis.detectedSignals,
+          conversationGoal: analysis.conversationGoal,
+          riskDetected: analysis.riskDetected,
+          nextBestAction: analysis.nextBestAction,
+          shouldContinue: analysis.shouldContinue,
+          reasoning: analysis.reasoning,
+        },
+        deterministicResponse: analysis.response,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "The OpenAI language layer returned an error."
+      );
+    }
+
+    setOpenAiResponse(data.response || "");
+    setOpenAiStatus("success");
+  } catch (error) {
+    setOpenAiStatus("error");
+    setOpenAiError(
+      error instanceof Error
+        ? error.message
+        : "The OpenAI language layer failed."
+    );
+  }
+}
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-slate-950">
@@ -837,75 +916,118 @@ export default function Home() {
             </p>
 
             <div className="grid gap-5 lg:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Simulated candidate reply
-                </label>
+			  <div>
+				<label className="mb-2 block text-sm font-medium text-slate-700">
+				  Simulated candidate reply
+				</label>
 
-                <textarea
-                  value={candidateReply}
-                  onChange={(event) => setCandidateReply(event.target.value)}
-                  rows={8}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                />
+				<textarea
+				  value={candidateReply}
+				  onChange={(event) => setCandidateReply(event.target.value)}
+				  rows={8}
+				  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+				/>
 
-                <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
-                  <QuickReply
-                    label="Interested + autonomy"
-                    onClick={() =>
-                      setCandidateReply(
-                        "This sounds interesting, but I would want to understand how much autonomy the role actually has."
-                      )
-                    }
-                  />
-                  <QuickReply
-                    label="Compensation"
-                    onClick={() =>
-                      setCandidateReply(
-                        "I could be open, but what is the compensation range and equity package?"
-                      )
-                    }
-                  />
-                  <QuickReply
-                    label="Remote concern"
-                    onClick={() =>
-                      setCandidateReply(
-                        "I am interested, but I can only consider remote or hybrid roles."
-                      )
-                    }
-                  />
-                  <QuickReply
-                    label="Not interested"
-                    onClick={() =>
-                      setCandidateReply(
-                        "Thanks for reaching out, but I am not interested right now."
-                      )
-                    }
-                  />
-                </div>
-              </div>
+				<div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+				  <QuickReply
+					label="Interested + autonomy"
+					onClick={() =>
+					  setCandidateReply(
+						"This sounds interesting, but I would want to understand how much autonomy the role actually has."
+					  )
+					}
+				  />
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <OutputBlock
-                  label="Agent reasoning"
-                  value={analysis.reasoning}
-                  muted
-                />
+				  <QuickReply
+					label="Compensation"
+					onClick={() =>
+					  setCandidateReply(
+						"I could be open, but what is the compensation range and equity package?"
+					  )
+					}
+				  />
 
-                <OutputBlock
-                  label="Agent response"
-                  value={analysis.response}
-                  muted
-                />
+				  <QuickReply
+					label="Remote concern"
+					onClick={() =>
+					  setCandidateReply(
+						"I am interested, but I can only consider remote or hybrid roles."
+					  )
+					}
+				  />
 
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm text-slate-500">Next action</p>
-                  <p className="mt-1 font-semibold text-blue-700">
-                    {analysis.nextBestAction}
-                  </p>
-                </div>
-              </div>
-            </div>
+				  <QuickReply
+					label="Not interested"
+					onClick={() =>
+					  setCandidateReply(
+						"Thanks for reaching out, but I am not interested right now."
+					  )
+					}
+				  />
+				</div>
+
+				<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+				  <button
+					onClick={generateOpenAiResponse}
+					disabled={openAiStatus === "loading" || !candidateReply.trim()}
+					className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+				  >
+					{openAiStatus === "loading"
+					  ? "Generating OpenAI response..."
+					  : "Generate OpenAI language-layer response"}
+				  </button>
+
+				  <p className="mt-3 text-xs leading-5 text-slate-500">
+					OpenAI is used only as the language layer. The agent state, risk,
+					next-best-action, and sequence control are decided before this call.
+				  </p>
+				</div>
+			  </div>
+
+			  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+				<OutputBlock label="Agent reasoning" value={analysis.reasoning} muted />
+
+				<OutputBlock
+				  label="Deterministic agent response"
+				  value={analysis.response}
+				  muted
+				/>
+
+				{openAiStatus === "error" && (
+				  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+					<p className="text-sm font-semibold text-red-700">
+					  OpenAI language layer error
+					</p>
+
+					<p className="mt-1 text-sm leading-6 text-red-700">
+					  {openAiError}
+					</p>
+
+					<p className="mt-2 text-xs leading-5 text-red-600">
+					  The deterministic agent response remains available as the fallback.
+					</p>
+				  </div>
+				)}
+
+				{openAiResponse && (
+				  <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+					<p className="text-sm font-semibold text-blue-700">
+					  OpenAI language-layer response
+					</p>
+
+					<p className="mt-2 leading-7 text-slate-800">{openAiResponse}</p>
+				  </div>
+				)}
+
+				<div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+				  <p className="text-sm text-slate-500">Next action</p>
+
+				  <p className="mt-1 font-semibold text-blue-700">
+					{analysis.nextBestAction}
+				  </p>
+				</div>
+			  </div>
+			</div>
           </Panel>
         </section>
       </section>
