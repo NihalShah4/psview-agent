@@ -82,12 +82,12 @@ function matchedKeywords(text: string, keywords: string[]) {
   return keywords.filter((keyword) => normalized.includes(keyword));
 }
 
-function cleanSentence(text: string) {
-  return text.trim().replace(/[.!?]+$/, "");
+function cleanPhrase(text: string) {
+  return text.trim().replace(/[.!?]+$/g, "");
 }
 
-function lowerClean(text: string) {
-  return cleanSentence(text).toLowerCase();
+function lowerPhrase(text: string) {
+  return cleanPhrase(text).toLowerCase();
 }
 
 function inferAgentName(companyName: string) {
@@ -129,34 +129,31 @@ function inferPersonality(context: CompanyContext) {
 }
 
 function buildOperatingPrinciples(context: CompanyContext) {
+  const company = context.companyName || "the company";
+  const intent = lowerPhrase(context.intent || "candidate engagement");
+  const tone = lowerPhrase(context.tone || "professional and human");
+  const hiringProfile = lowerPhrase(
+    context.hiringProfile || "the target hiring profile"
+  );
+
   return [
-    `Represent ${
-      context.companyName || "the company"
-    } using the stated culture, not generic recruiter language.`,
-    `Optimize for ${
-      context.intent || "candidate engagement"
-    } rather than sending one-off messages.`,
-    `Keep the tone ${
-      context.tone || "professional and human"
-    } across every interaction.`,
-    `Qualify for ${
-      context.hiringProfile || "the target hiring profile"
-    } through the conversation.`,
+    `Represent ${company} using the stated culture, not generic recruiter language.`,
+    `Optimize for ${intent} rather than sending one-off messages.`,
+    `Keep the tone ${tone} across every interaction.`,
+    `Qualify for ${hiringProfile} through the conversation.`,
     "Adapt the next action based on candidate state, risk, and intent instead of blindly continuing a sequence.",
   ];
 }
 
 function buildReasoningTrace(context: CompanyContext) {
   const combined = Object.values(context).join(" ").toLowerCase();
+  const hiringProfile = cleanPhrase(context.hiringProfile || "not specified");
+  const tone = cleanPhrase(context.tone || "not specified");
 
   const trace = [
     "Parsed company context into identity, culture, hiring profile, tone, role, and outreach intent.",
-    `Detected the target candidate profile as: ${
-      context.hiringProfile || "not specified"
-    }.`,
-    `Selected a communication style based on the requested tone: ${
-      context.tone || "not specified"
-    }.`,
+    `Detected the target candidate profile as: ${hiringProfile}.`,
+    `Selected a communication style based on the requested tone: ${tone}.`,
   ];
 
   if (includesAny(combined, ["founder", "founding", "early"])) {
@@ -187,9 +184,9 @@ function buildReasoningTrace(context: CompanyContext) {
 function buildMessageSequence(context: CompanyContext): MessageStep[] {
   const company = context.companyName || "the company";
   const role = context.role || "the role";
-  const culture = lowerClean(context.culture || "a high-context team");
-  const intent = lowerClean(context.intent || "start a relevant conversation");
-  const hiringProfile = lowerClean(context.hiringProfile || "strong candidates");
+  const culture = lowerPhrase(context.culture || "a high-context team");
+  const intent = lowerPhrase(context.intent || "start a relevant conversation");
+  const hiringProfile = lowerPhrase(context.hiringProfile || "strong candidates");
 
   return [
     {
@@ -199,7 +196,7 @@ function buildMessageSequence(context: CompanyContext): MessageStep[] {
       objective: "Create relevance without sounding automated.",
       psychology:
         "The first message avoids over-selling. It tests whether the candidate is open to the type of environment before asking for time.",
-      message: `Hi, I am reaching out on behalf of ${company}. We are looking for a ${role}, but the real filter is not just experience. We are looking for someone who can operate in ${culture.toLowerCase()} and make strong decisions with incomplete information. Your background looked potentially aligned, so I wanted to start with a direct question: are you open to a role where ownership is high and ambiguity is part of the job?`,
+      message: `Hi, I am reaching out on behalf of ${company}. We are looking for a ${role}, but the real filter is not just experience. The team is ${culture}, and the role needs someone who can make strong decisions with incomplete information. Your background looked potentially aligned, so I wanted to start with a direct question: are you open to a role where ownership is high and ambiguity is part of the job?`,
     },
     {
       step: 2,
@@ -208,7 +205,7 @@ function buildMessageSequence(context: CompanyContext): MessageStep[] {
       objective: "Explain why the role exists and qualify motivation.",
       psychology:
         "The second message gives context only after the candidate has a reason to care. It frames the opportunity around fit, not hype.",
-      message: `${company} is not trying to run a generic hiring process. The goal is to find ${hiringProfile.toLowerCase()}. The reason I am reaching out is simple: ${intent.toLowerCase()}. If that kind of environment is interesting, I can share more context and see whether there is a real fit.`,
+      message: `${company} is not trying to run a generic hiring process. The goal is to find ${hiringProfile}. The reason I am reaching out is simple: ${intent}. If that kind of environment is interesting, I can share more context and see whether there is a real fit.`,
     },
     {
       step: 3,
