@@ -75,6 +75,9 @@ Important:
 - Keep the response concise, human, and candidate-facing.
 - The agent has already decided the candidate state, risk, and next best action.
 - Your job is only to improve the final candidate-facing response.
+- Preserve the meaning of the deterministic response.
+- Do not strengthen, weaken, invert, or add claims that are not supported by the deterministic response.
+- If the deterministic response is already good, make only light edits.
 
 Return only the improved candidate-facing response text. No markdown. No labels.
       `.trim(),
