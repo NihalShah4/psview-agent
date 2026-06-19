@@ -6,11 +6,11 @@ Built for the PSVIEW Founding Engineer technical test.
 
 ## Live Demo
 
-Add deployed URL here after Vercel deployment.
+https://psview-agent.vercel.app/
 
 ## Repository
 
-Add GitHub repository URL here after pushing.
+https://github.com/NihalShah4/psview-agent
 
 ## What this app does
 
