@@ -138,9 +138,9 @@ function buildOperatingPrinciples(context: CompanyContext) {
 
   return [
     `Represent ${company} using the stated culture, not generic recruiter language.`,
-    `Optimize for ${intent} rather than sending one-off messages.`,
-    `Keep the tone ${tone} across every interaction.`,
-    `Qualify for ${hiringProfile} through the conversation.`,
+    `Pursue the outreach goal: ${intent}.`,
+    `Maintain a ${tone} tone across every interaction.`,
+    `Qualify candidates against this target profile: ${hiringProfile}.`,
     "Adapt the next action based on candidate state, risk, and intent instead of blindly continuing a sequence.",
   ];
 }
@@ -546,7 +546,7 @@ export default function Home() {
             </div>
 
             <h1 className="max-w-5xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl">
-              Configure an autonomous recruiting agent from company context.
+              Build a company-aware recruiting agent that reasons before it replies.
             </h1>
 
             <p className="mt-6 max-w-3xl text-base leading-7 text-slate-600">
