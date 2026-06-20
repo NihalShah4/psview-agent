@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type CompanyContext = {
   companyName: string;
@@ -46,6 +46,14 @@ type AutonomyStep = {
   title: string;
   description: string;
   value: string;
+};
+
+type AgentActivityState = "done" | "active" | "error" | "waiting";
+
+type AgentActivityStep = {
+  label: string;
+  detail: string;
+  state: AgentActivityState;
 };
 
 const sampleContext: CompanyContext = {
@@ -399,7 +407,7 @@ function analyzeCandidateReply(
       shouldContinue: "Stop",
       reasoning:
         "The candidate has given a clear negative signal. A good autonomous agent should not continue a prebuilt sequence when the candidate has opted out.",
-      response: `Totally fair. I will not push. If your situation changes later, ${company} may still be worth keeping on your radar, especially for people interested in high-ownership ${role} work.`,
+      response: `Thank you for the clarification. I will not continue the sequence. If your circumstances change later, ${company} may still be relevant for candidates interested in high-ownership ${role} work.`,
     };
   }
 
@@ -415,7 +423,7 @@ function analyzeCandidateReply(
       shouldContinue: "Continue",
       reasoning:
         "The candidate is not rejecting the opportunity. They are checking whether the opportunity is economically worth their time. The agent should treat this as a qualification signal, not an objection.",
-      response: `Fair question. Compensation matters, especially for a ${role}. I do not want to give a vague answer without the latest range, but I can make compensation one of the first topics so you can judge quickly whether ${company} is worth your time.`,
+      response: `Thank you for raising that. Compensation is an important qualification factor for a ${role}. Rather than provide an imprecise range, I would make compensation one of the first topics in the next conversation so both sides can assess fit efficiently.`,
     };
   }
 
@@ -431,7 +439,7 @@ function analyzeCandidateReply(
       shouldContinue: "Pause",
       reasoning:
         "The candidate has positive intent but also introduced a practical constraint. Continuing to sell the role without resolving that constraint would make the agent feel scripted.",
-      response: `That is the right thing to clarify early. For ${company}, I would treat work model and logistics as fit criteria, not details to hide until late in the process. If that constraint works, then the next conversation should focus on whether the ${role} scope is actually compelling for you.`,
+      response: `That is an important constraint to clarify early. For ${company}, work model and logistics should be treated as fit criteria, not late-stage details. If the constraint is workable, the next conversation should focus on whether the ${role} scope is aligned with your expectations.`,
     };
   }
 
@@ -447,7 +455,7 @@ function analyzeCandidateReply(
       shouldContinue: "Pause",
       reasoning:
         "The candidate is asking about feasibility. The agent should not move to persuasion until the practical blocker is addressed.",
-      response: `That is worth clarifying before either side spends more time. For ${company}, I would rather surface logistics early than create a late-stage mismatch. What constraint matters most for you here: location, remote flexibility, timing, or authorization?`,
+      response: `That should be clarified before either side invests additional time. For ${company}, it is better to surface logistics early than create a late-stage mismatch. Which constraint is most important here: location, remote flexibility, timing, or authorization?`,
     };
   }
 
@@ -463,7 +471,7 @@ function analyzeCandidateReply(
       shouldContinue: "Pause",
       reasoning:
         "The candidate did not reject the role. They gave a timing objection. The correct move is to lower pressure and preserve future optionality.",
-      response: `Understood. I will keep this lightweight. Would it be reasonable to check back later with a concise summary of why ${company} may be relevant, instead of trying to force timing now?`,
+      response: `Understood. It would not be appropriate to force timing if this is not a priority right now. Would it be acceptable to follow up later with a concise summary of why ${company} may be relevant?`,
     };
   }
 
@@ -479,7 +487,7 @@ function analyzeCandidateReply(
       shouldContinue: "Continue",
       reasoning:
         `The candidate is interested and is evaluating whether the opportunity has real scope. This is a strong signal for a ${role} because the candidate is evaluating real ownership, not just title.`,
-      response: `That is exactly the right question. For ${company}, autonomy should mean owning the path from ambiguous product goal to shipped technical decision, not just choosing tickets independently. For the ${role}, the most useful conversation would be about how you reason through unclear constraints and decide what to build. Worth a short technical conversation this week?`,
+      response: `TThat is an important point to clarify. For ${company}, autonomy should mean owning the path from an ambiguous product goal to a shipped technical decision, not simply choosing tickets independently. For the ${role}, the next conversation should evaluate how you reason through unclear constraints and decide what to build. Would you be open to a focused technical conversation this week?`,
     };
   }
 
@@ -495,7 +503,7 @@ function analyzeCandidateReply(
       shouldContinue: "Continue",
       reasoning:
         "The candidate gave a positive signal. The agent should stop persuading and move toward qualification and scheduling.",
-      response: `Great. The most important thing to know is that ${company} is looking for someone who can reason through ambiguous product and technical problems, not just execute tickets. For ${role}, the conversation should focus on how you make decisions, ship, and handle unclear constraints. Are you open to a short technical conversation this week?`,
+      response: `Thank you for your interest. For ${company}, the priority is to evaluate candidates who can reason through ambiguous product and technical problems, not only execute assigned tickets. For the ${role}, the next conversation should focus on decision-making, execution judgment, and ability to handle unclear constraints. Would you be open to a focused technical conversation this week?`,
     };
   }
 
@@ -511,7 +519,7 @@ function analyzeCandidateReply(
       shouldContinue: "Continue",
       reasoning:
         `The candidate is probing role quality. For a ${role}, that is a valuable signal because strong candidates often evaluate ownership, product input, and decision-making scope before process.`,
-      response: `Good question. I would define autonomy here as owning the reasoning path, not just owning tasks. The question is whether you want a role where the problem may be clear, but the technical path is yours to shape. What level of ownership would make this worth exploring for you?`,
+      response: `That is an important distinction. In this context, autonomy means owning the reasoning path and technical approach, not simply completing assigned tasks. The problem may be clearly defined, but the implementation path and product judgment still matter. What level of ownership would make this role worth exploring for you?`,
     };
   }
 
@@ -526,7 +534,7 @@ function analyzeCandidateReply(
     shouldContinue: "Pause",
     reasoning:
       "The candidate response does not clearly show interest, rejection, timing concern, logistics concern, compensation concern, or scope evaluation. The agent should not guess.",
-    response: `Helpful context. To avoid guessing, I would ask one direct question: what would make a ${role} opportunity at ${company} worth exploring for you right now?`,
+    response: `Thank you for the context. To avoid making assumptions, I would ask one direct question: what would make a ${role} opportunity at ${company} worth exploring for you at this stage?`,
   };
 }
 
@@ -541,7 +549,9 @@ export default function Home() {
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [openAiError, setOpenAiError] = useState("");
-
+  const [lastAutonomousRun, setLastAutonomousRun] = useState("");
+  const latestRunId = useRef(0);
+  
   const agent = useMemo(() => generateAgent(context), [context]);
   const analysis = useMemo(
     () => analyzeCandidateReply(candidateReply, context),
@@ -553,11 +563,142 @@ export default function Home() {
     [context, analysis]
   );
   
-  useEffect(() => {
-    setOpenAiResponse("");
-    setOpenAiError("");
-    setOpenAiStatus("idle");
-  }, [candidateReply, context]);
+	useEffect(() => {
+	  const runId = latestRunId.current + 1;
+	  latestRunId.current = runId;
+
+	  setOpenAiResponse("");
+	  setOpenAiError("");
+	  setLastAutonomousRun("");
+
+	  if (!candidateReply.trim()) {
+		setOpenAiStatus("idle");
+		return;
+	  }
+
+	  setOpenAiStatus("loading");
+
+	  const timeoutId = window.setTimeout(async () => {
+		try {
+		  const response = await fetch("/api/language-layer", {
+			method: "POST",
+			headers: {
+			  "Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+			  companyContext: context,
+			  candidateReply,
+			  decisionModel: {
+				candidateState: analysis.candidateState,
+				confidence: analysis.confidence,
+				detectedSignals: analysis.detectedSignals,
+				conversationGoal: analysis.conversationGoal,
+				riskDetected: analysis.riskDetected,
+				nextBestAction: analysis.nextBestAction,
+				shouldContinue: analysis.shouldContinue,
+				reasoning: analysis.reasoning,
+			  },
+			  deterministicResponse: analysis.response,
+			}),
+		  });
+
+		  const data = await response.json();
+
+		  if (latestRunId.current !== runId) {
+			return;
+		  }
+
+		  if (!response.ok) {
+			throw new Error(
+			  data.error || "The OpenAI language layer returned an error."
+			);
+		  }
+
+		  setOpenAiResponse(data.response || "");
+		  setOpenAiStatus("success");
+		  setLastAutonomousRun(
+			new Date().toLocaleTimeString([], {
+			  hour: "2-digit",
+			  minute: "2-digit",
+			  second: "2-digit",
+			})
+		  );
+		} catch (error) {
+		  if (latestRunId.current !== runId) {
+			return;
+		  }
+
+		  setOpenAiStatus("error");
+		  setOpenAiError(
+			error instanceof Error
+			  ? error.message
+			  : "The OpenAI language layer failed."
+		  );
+		}
+	  }, 900);
+	  
+	  return () => {
+		window.clearTimeout(timeoutId);
+	  };
+	}, [candidateReply, context, analysis]);
+	
+  const languageLayerState: AgentActivityState =
+  openAiStatus === "loading"
+	? "active"
+	: openAiStatus === "success"
+	? "done"
+	: openAiStatus === "error"
+	? "error"
+	: "waiting";
+
+  const autonomousStatusLabel =
+	openAiStatus === "loading"
+	  ? "Thinking"
+	  : openAiStatus === "success"
+	  ? "Ready"
+	  : openAiStatus === "error"
+	  ? "Fallback active"
+	  : "Waiting";
+
+  const activitySteps: AgentActivityStep[] = [
+	{
+	  label: "Context parsed",
+	  detail: context.companyName
+		? `${context.companyName} context loaded`
+		: "Waiting for company context",
+	  state: "done",
+	},
+	{
+	  label: "Policy updated",
+	  detail: `${agent.agentName} configured`,
+	  state: "done",
+	},
+	{
+	  label: "Candidate signal classified",
+	  detail: `${analysis.candidateState} · ${analysis.confidence}% confidence`,
+	  state: "done",
+	},
+	{
+	  label: "Next action selected",
+	  detail: analysis.nextBestAction,
+	  state: "done",
+	},
+	{
+	  label: "Language layer",
+	  detail:
+	  openAiStatus === "success"
+		  ? `OpenAI response generated${
+			  lastAutonomousRun ? ` at ${lastAutonomousRun}` : ""
+			}`
+		  : openAiStatus === "loading"
+		  ? "Generating candidate-facing response"
+		  : openAiStatus === "error"
+		  ? "OpenAI failed; deterministic fallback is active"
+		  : "Waiting for candidate input",
+	  state: languageLayerState,
+	},
+  ];
+
 
   function updateField(field: keyof CompanyContext, value: string) {
     setContext((previous) => ({
@@ -565,54 +706,6 @@ export default function Home() {
       [field]: value,
     }));
   }
-  
-  async function generateOpenAiResponse() {
-  setOpenAiStatus("loading");
-  setOpenAiError("");
-  setOpenAiResponse("");
-
-  try {
-    const response = await fetch("/api/language-layer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        companyContext: context,
-        candidateReply,
-        decisionModel: {
-          candidateState: analysis.candidateState,
-          confidence: analysis.confidence,
-          detectedSignals: analysis.detectedSignals,
-          conversationGoal: analysis.conversationGoal,
-          riskDetected: analysis.riskDetected,
-          nextBestAction: analysis.nextBestAction,
-          shouldContinue: analysis.shouldContinue,
-          reasoning: analysis.reasoning,
-        },
-        deterministicResponse: analysis.response,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error || "The OpenAI language layer returned an error."
-      );
-    }
-
-    setOpenAiResponse(data.response || "");
-    setOpenAiStatus("success");
-  } catch (error) {
-    setOpenAiStatus("error");
-    setOpenAiError(
-      error instanceof Error
-        ? error.message
-        : "The OpenAI language layer failed."
-    );
-  }
-}
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-slate-950">
@@ -967,20 +1060,27 @@ export default function Home() {
 				</div>
 
 				<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-				  <button
-					onClick={generateOpenAiResponse}
-					disabled={openAiStatus === "loading" || !candidateReply.trim()}
-					className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-				  >
-					{openAiStatus === "loading"
-					  ? "Generating OpenAI response..."
-					  : "Generate OpenAI language-layer response"}
-				  </button>
+				  <div className="flex flex-wrap items-start justify-between gap-3">
+					<div>
+					  <p className="text-sm font-semibold text-slate-950">
+						Autonomous preview mode
+					  </p>
+					  <p className="mt-1 text-xs leading-5 text-slate-500">
+						The agent reruns automatically when company context or candidate reply
+						changes. OpenAI is used only after the decision model is selected.
+					  </p>
+					</div>
 
-				  <p className="mt-3 text-xs leading-5 text-slate-500">
-					OpenAI is used only as the language layer. The agent state, risk,
-					next-best-action, and sequence control are decided before this call.
-				  </p>
+					<span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+					  {autonomousStatusLabel}
+					</span>
+				  </div>
+
+				  <div className="mt-4 space-y-2">
+					{activitySteps.map((step) => (
+					  <ActivityStep key={step.label} step={step} />
+					))}
+				  </div>
 				</div>
 			  </div>
 
@@ -1131,6 +1231,30 @@ function OutputBlock({
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+function ActivityStep({ step }: { step: AgentActivityStep }) {
+  const stateClass =
+    step.state === "done"
+      ? "bg-emerald-500"
+      : step.state === "active"
+      ? "animate-pulse bg-blue-600"
+      : step.state === "error"
+      ? "bg-red-500"
+      : "bg-slate-300";
+
+  return (
+    <div className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3">
+      <span
+        className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${stateClass}`}
+      />
+
+      <div>
+        <p className="text-xs font-semibold text-slate-950">{step.label}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p>
+      </div>
     </div>
   );
 }
